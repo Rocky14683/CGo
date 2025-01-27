@@ -42,6 +42,7 @@ template <class U>
     requires type_traits::is_serializable_nonptr<U>::value
 larrow<U> operator-(Channel<U>& chan) {
     std::lock_guard<std::mutex> lock(chan.mtx);
+    while(chan.data.empty());
     auto data = chan.data.front();
     chan.data.pop();
     return larrow<U>(data);
