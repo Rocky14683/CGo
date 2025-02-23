@@ -7,13 +7,7 @@
 #include <type_traits>
 #include <thread>
 #include <mutex>
-#include <exception>
-#include <expected>
-
-#define nil std::nullopt
-
-template <class T, class Err_t = std::exception>
-using err = std::expected<T, Err_t>;
+#include "error.hpp"
 
 
 
