@@ -7,7 +7,17 @@
 
 inline constexpr std::nullopt_t nil = std::nullopt;
 
-template <class E>
+class nullexception : public std::exception {
+    public:
+        nullexception() = default;
+
+        [[nodiscard]] inline auto what() const noexcept -> const char* override {
+            return "nil";
+        }
+};
+
+
+template <class E = nullexception>
     requires std::is_base_of_v<std::exception, E>
 class error {
     public:
@@ -34,33 +44,47 @@ class error {
             return os;
         }
 
-        operator std::optional<E>() const {
+        constexpr inline operator std::optional<E>() const {
             return err;
+        }
+
+        constexpr inline bool operator==(std::nullopt_t nullopt) const {
+            return err == nullopt;
         }
 
     private:
         std::optional<E> err = nil; // Store the error (if any)
 };
 
-//TODO: get formmater working: std::print, std::format, std::println
+
+
 template <class E>
 struct std::formatter<error<E>> : std::formatter<std::string> {
         constexpr auto parse(std::format_parse_context& ctx) {
             return ctx.begin();
         }
 
-        auto format(const error<E>& obj, std::format_context& ctx) const {
+        template <typename FormatContext>
+        auto format(const error<E>& obj, FormatContext& ctx) const {
             return std::formatter<std::string>::format(obj.to_string(), ctx);
         }
 };
 
+
 [[gnu::constructor(0)]]
 int entry() {
     error<std::runtime_error> err("error: {}", 42);
-//    std::string formatted = std::format("{}", err); // Use std::format explicitly
-    std::cout << err << "\n";
-    std::cout << err << "\n";
-//    std::format("{}", err);
-//    std::print("{}\n", err);
+    error err2;
+    if (err != nil) {
+        std::print("{}\n", err);
+    }
+
+    if(err2 != nil) {
+        std::print("{}\n", err2);
+    } else {
+        std::print("nothing\n");
+    }
+
+
     return 0;
 }
