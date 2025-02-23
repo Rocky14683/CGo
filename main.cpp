@@ -8,6 +8,14 @@
 #include <thread>
 #include <mutex>
 #include <exception>
+#include <expected>
+
+#define nil std::nullopt
+
+template <class T, class Err_t = std::exception>
+using err = std::expected<T, Err_t>;
+
+
 
 namespace type_traits {
 template <class T> struct is_serializable : std::false_type {};
@@ -52,7 +60,7 @@ template <class T> struct larrow {
 
         template <class U = T>
             requires std::is_signed<U>::value && std::is_arithmetic<U>::value
-        larrow(const U& x) : data(std::move(x)) {
+        larrow(const U& x) : data(-x) {
 //            std::println("con2: {}", data);
         }
 
@@ -67,6 +75,25 @@ larrow<U> operator-(U&& x) {
     return larrow<U>(std::forward<U>(x));
 }
 
+template <class T> struct larrow_out {
+
+        template <class U = T>
+        larrow_out(const T& x)
+            : data(std::move(x)) {
+            //            std::println("con1: {}", data);
+        }
+
+        auto get_data() const { return data; }
+    private:
+        T data;
+};
+
+template <class U>
+    requires type_traits::is_serializable_nonptr<U>::value && std::is_signed_v<U>
+larrow_out<U> operator-(U&& x) {
+    return larrow_out<U>(-x);
+}
+
 
 
 template <class T>
@@ -78,7 +105,7 @@ class Channel {
 
         template <class U>
             requires type_traits::is_serializable_nonptr<U>::value
-        friend larrow<U> operator-(Channel<U>& chan);
+        friend larrow_out<U> operator-(Channel<U>& chan);
 
         friend void operator<(Channel<T>& lhs, const larrow<T>& rhs) {
             if(lhs.is_closed) {
@@ -104,7 +131,7 @@ class Channel {
 
 template <class U>
     requires type_traits::is_serializable_nonptr<U>::value
-larrow<U> operator-(Channel<U>& chan) {
+larrow_out<U> operator-(Channel<U>& chan) {
     if(chan.is_closed) {
         throw std::runtime_error("Channel is closed");
     }
@@ -112,8 +139,7 @@ larrow<U> operator-(Channel<U>& chan) {
     chan.cv.wait(lock, [&chan] { return !chan.data.empty(); });
     auto data = chan.data.front();
     chan.data.pop();
-//    std::print("IN operator- {}\n", data);
-    return larrow<U>(data);
+    return larrow_out<U>(data);
 }
 
 template <class T> void drain(Channel<T>& chan) {
@@ -126,7 +152,7 @@ template <class T> void drain(Channel<T>& chan) {
 
 template <class T>
     requires type_traits::is_serializable_nonptr<T>::value
-T operator<(T& lhs, larrow<T> rhs) {
+T operator<(T& lhs, larrow_out<T> rhs) {
     lhs = rhs.get_data();
     return lhs;
 }
@@ -189,8 +215,12 @@ int main() {
 
 
     auto chanInt = Channel<int>::make_chan();
-    chanInt <- 42;
+    chanInt <- -42;
+    chanInt <- 43;
 
+    auto chanUint = Channel<unsigned int>::make_chan();
+    chanUint <- 12;
+    chanUint <- 69;
     auto chanString = Channel<std::string>::make_chan();
     chanString <- std::string("Hello, World!");
     WaitGroup wg;
@@ -209,6 +239,15 @@ int main() {
     int c;
     c <- chanInt;
     std::print("{}\n", c);
+    c <- chanInt;
+    std::print("{}\n", c);
+
+    unsigned int u;
+    u <- chanUint;
+    std::print("{}\n", u);
+    u <- chanUint;
+    std::print("{}\n", u);
+
 
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(200ms);
