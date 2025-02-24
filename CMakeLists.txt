@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.28)
 project(CGo)
 
+set(CMAKE_CXX_COMPILER "/opt/homebrew/bin/gcc")
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++23 -fcoroutines")
 
 # Include GoogleTest
 include(FetchContent)
@@ -12,17 +13,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-enable_testing()
+
 
 # Main program
 add_executable(CGo src/main.cpp)
 target_include_directories(CGo PRIVATE include)
+# link against the standard C++ library so that coroutines work
+target_link_libraries(CGo stdc++)
 
 # GoogleTest-based tests
+enable_testing()
+
 file(GLOB TEST_SOURCES test/*.cpp)
 add_executable(GTEST ${TEST_SOURCES})
 target_include_directories(GTEST PRIVATE include)
-target_link_libraries(GTEST gtest gtest_main)
+# link against the standard C++ library so that coroutines work
+target_link_libraries(GTEST stdc++ gtest gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(GTEST)
