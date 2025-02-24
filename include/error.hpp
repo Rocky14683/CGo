@@ -71,20 +71,19 @@ struct std::formatter<error<E>> : std::formatter<std::string> {
 };
 
 
-[[gnu::constructor(0)]]
-int entry() {
-    error<std::runtime_error> err("error: {}", 42);
-    error err2;
-    if (err != nil) {
-        std::print("{}\n", err);
-    }
-
-    if(err2 != nil) {
-        std::print("{}\n", err2);
-    } else {
-        std::print("nothing\n");
-    }
-
-
-    return 0;
-}
+//[[gnu::constructor(0)]]
+//int entry() {
+//    error<std::runtime_error> err("error: {}", 42);
+//    error err2;
+//    if (err != nil) {
+//        std::print("{}\n", err);
+//    }
+//
+//    if(err2 != nil) {
+//        std::print("{}\n", err2);
+//    } else {
+//        std::print("nothing\n");
+//    }
+//
+//    return 0;
+//}
