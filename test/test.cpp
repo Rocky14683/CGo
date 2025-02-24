@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
+#include <atomic>
 #include "defer.hpp"
 #include "channel.hpp"
-
 
 // Demonstrate some basic assertions.
 TEST(HelloTest, BasicAssertions) {
@@ -38,7 +38,6 @@ TEST(channel_test, BasicAssertions) {
     i <- chanInt;
     EXPECT_EQ(i, -42);
 
-
     unsigned int u;
     u <- chanUint;
 
@@ -47,4 +46,50 @@ TEST(channel_test, BasicAssertions) {
     std::string s;
     s <- chanString;
     EXPECT_EQ(s, "Hello, World!");
+}
+
+TEST(buffered_channel_test, BasicAssertions) {
+    auto chanUint = Channel<unsigned int>::make_chan(2);
+    chanUint <- 12;
+    chanUint <- 24;
+
+    unsigned int u;
+    u < -chanUint;
+    EXPECT_EQ(u, 12);
+
+    u < -chanUint;
+    EXPECT_EQ(u, 24);
+
+    std::atomic_bool done {false};
+
+    auto chanInt = Channel<int>::make_chan(2);
+
+    std::thread([&]() {
+        chanInt <- 11;
+        chanInt <- 22;
+        chanInt <- 33;
+        done.store(true);
+    }).detach();
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    ASSERT_FALSE(done.load()) << "Channel overflow should block the thread";
+}
+
+
+TEST(for_each_channel_test, BasicAssertions) {
+    auto chanInt = Channel<int>::make_chan();
+    chanInt <- 1;
+    chanInt <- 2;
+    chanInt <- 3;
+    chanInt <- 1;
+    chanInt <- 2;
+    chanInt <- 3;
+
+    int sum = 0;
+    for (auto i : chanInt) {
+        sum += i;
+    }
+
+    EXPECT_EQ(sum, 12);
 }
