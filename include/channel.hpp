@@ -22,30 +22,23 @@ template <class T> struct is_serializable_nonptr
 
 }; // namespace type_traits
 
-
-class ChanError : public std::exception {
-    public:
-        ChanError(const char* msg) : std::exception() {}
-
-        const char* what() const noexcept override { return msg.c_str(); }
-
-    private:
-        std::string msg;
-};
-
-
+// class ChanError : public std::exception {
+//     public:
+//         ChanError(const char* msg) : std::exception() {}
+//
+//         const char* what() const noexcept override { return msg.c_str(); }
+//     private:
+//         std::string msg;
+// };
 
 template <class T>
     requires type_traits::is_serializable_nonptr<T>::value
 class Channel;
 
-
 template <class T> struct larrow {
-
         template <class U = T>
             requires(!std::is_signed_v<T> || !std::is_arithmetic_v<T>)
-        larrow(const T& x)
-            : data(std::move(x)) {
+        larrow(const T& x) : data(std::move(x)) {
             //            std::println("con1: {}", data);
         }
 
@@ -67,10 +60,7 @@ larrow<U> operator-(U&& x) {
 }
 
 template <class T> struct larrow_out {
-
-        template <class U = T>
-        larrow_out(const T& x)
-            : data(std::move(x)) {
+        template <class U = T> larrow_out(const T& x) : data(std::move(x)) {
             //            std::println("con1: {}", data);
         }
 
@@ -85,27 +75,50 @@ larrow_out<U> operator-(U&& x) {
     return larrow_out<U>(-x);
 }
 
-
-
 template <class T>
     requires type_traits::is_serializable_nonptr<T>::value
 class Channel {
-
     public:
-        static Channel<T> make_chan() { return Channel<T>(); }
+        static Channel<T> make_chan(std::optional<size_t> size = std::nullopt) { return Channel<T>(size); }
+
+        Channel<T>(std::optional<size_t> q_size) : q_size(q_size) {};
+
+        Channel<T>(const Channel<T>&) = delete;
+
+        Channel<T>& operator=(const Channel<T>&) = delete;
+
+        Channel<T>(Channel<T>&&) = delete;
+
+        Channel<T>& operator=(Channel<T>&&) = delete;
 
         template <class U>
             requires type_traits::is_serializable_nonptr<U>::value
         friend larrow_out<U> operator-(Channel<U>& chan);
 
         friend void operator<(Channel<T>& lhs, const larrow<T>& rhs) {
-            if(lhs.is_closed) {
-                throw std::runtime_error("Channel is closed");
+            if (lhs.is_closed) { throw std::runtime_error("Channel is closed"); }
+            std::unique_lock<std::mutex> lock(lhs.mtx);
+            // sends to a buffered channel block only when the buffer is full.
+            if (lhs.q_size.has_value() && lhs.data.size() == lhs.q_size.value()) {
+                lhs.cv.wait(lock, [&lhs] { return lhs.data.size() < lhs.q_size.value(); });
             }
-            std::lock_guard<std::mutex> lock(lhs.mtx);
-            lhs.data.push(rhs.get_data());
+            lhs.data.push_back(rhs.get_data());
             lhs.cv.notify_one();
         }
+
+
+        /*
+         * Iterator so that it can be used in for each loop
+         */
+
+        using iterator = typename std::deque<T>::iterator;
+        using const_iterator = typename std::deque<T>::const_iterator;
+
+        iterator begin() { return this->data.begin(); } // Access underlying deque
+        iterator end() { return this->data.end(); }
+
+        const_iterator begin() const { return this->data.begin(); }
+        const_iterator end() const { return this->data.end(); }
 
         inline constexpr void close() {
             std::lock_guard<std::mutex> lock(mtx);
@@ -113,23 +126,22 @@ class Channel {
         }
 
     private:
+        const std::optional<size_t> q_size;
         std::condition_variable cv;
-        std::queue<T> data;
+        std::deque<T> data;
         std::mutex mtx;
-        std::atomic_bool is_closed{false};
+        std::atomic_bool is_closed {false};
 };
-
 
 template <class U>
     requires type_traits::is_serializable_nonptr<U>::value
 larrow_out<U> operator-(Channel<U>& chan) {
-    if(chan.is_closed) {
-        throw std::runtime_error("Channel is closed");
-    }
+    if (chan.is_closed) { throw std::runtime_error("Channel is closed"); }
     std::unique_lock<std::mutex> lock(chan.mtx);
+    // receives block when the buffer is empty.
     chan.cv.wait(lock, [&chan] { return !chan.data.empty(); });
     auto data = chan.data.front();
-    chan.data.pop();
+    chan.data.pop_front();
     return larrow_out<U>(data);
 }
 
@@ -137,7 +149,7 @@ template <class T> void drain(Channel<T>& chan) {
     std::lock_guard<std::mutex> lock(chan.mtx);
     while (!chan.data.empty()) {
         std::println("{}", chan.data.front());
-        chan.data.pop();
+        chan.data.pop_front();
     }
 }
 
