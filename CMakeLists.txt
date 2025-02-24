@@ -3,7 +3,7 @@ project(CGo)
 
 set(CMAKE_CXX_COMPILER "/opt/homebrew/bin/gcc")
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++23 -fcoroutines")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++23 -fcoroutines -Wno-template-id-cdtor")
 
 # Include GoogleTest
 include(FetchContent)
