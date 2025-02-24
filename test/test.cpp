@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <atomic>
+#include <chrono>
 #include "defer.hpp"
 #include "channel.hpp"
 
@@ -54,10 +55,10 @@ TEST(buffered_channel_test, BasicAssertions) {
     chanUint <- 24;
 
     unsigned int u;
-    u < -chanUint;
+    u <- chanUint;
     EXPECT_EQ(u, 12);
 
-    u < -chanUint;
+    u <- chanUint;
     EXPECT_EQ(u, 24);
 
     std::atomic_bool done {false};
@@ -71,7 +72,8 @@ TEST(buffered_channel_test, BasicAssertions) {
         done.store(true);
     }).detach();
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(1s);
 
     ASSERT_FALSE(done.load()) << "Channel overflow should block the thread";
 }
